@@ -60,7 +60,7 @@ footer { margin-top:14px; color:var(--muted); font-size:13px; text-align:center;
   <header>
     <div>
       <h1>Quiz infinito de Instrumental Cirúrgico</h1>
-      <p class="sub">Veja a foto, tente lembrar o nome e avance sem limite. Dá para treinar por alternativas ou digitando a resposta.</p>
+      <p class="sub">Veja a foto, tente lembrar o nome e avance sem limite. Nas alternativas, aparecem só instrumentos da mesma família: pinça com pinça, tesoura com tesoura, e assim por diante.</p>
     </div>
     <div class="stats">
       <div class="stat"><span>Acertos</span><strong id="hits">0</strong></div>
@@ -89,7 +89,7 @@ footer { margin-top:14px; color:var(--muted); font-size:13px; text-align:center;
           <input id="answerInput" type="text" autocomplete="off" placeholder="Digite o nome do instrumental...">
           <button class="primary" id="checkBtn">Conferir</button>
         </div>
-        <p class="small">Não precisa acertar acento nem hífen. Ex.: “mayo hegar”, “kocher curva”, “allis”.</p>
+        <p class="small">Não precisa acertar acento nem hífen. Ex.: “mayo hegar”, “kocher curva”, “allis”. Nas alternativas, a resposta certa sempre vem do PDF; os nomes extras servem só para completar as opções.</p>
       </div>
       <div class="feedback" id="feedback">Quando responder, eu mostro o gabarito aqui.</div>
       <div class="controls">
@@ -135,16 +135,78 @@ function pickQuestion() {
   lastIds.push(current.id); if (lastIds.length > 8) lastIds.shift();
   answered = false;
   img.src = current.image;
-  $('counter').textContent = `${INSTRUMENTS.length} instrumentos no banco • página ${current.page} do PDF`;
+  $('counter').textContent = `${INSTRUMENTS.length} instrumentos no banco • ${categoryLabel(getCategory(current))} • página ${current.page} do PDF`;
   feedback.className = 'feedback';
   feedback.textContent = 'Quando responder, eu mostro o gabarito aqui.';
   $('answerInput').value = '';
   renderOptions();
   setTimeout(() => { if(mode === 'type') $('answerInput').focus(); }, 50);
 }
+const DISTRACTOR_BANK = {
+  pinca: [
+    'Pinça Adson', 'Pinça Adson Brown', 'Pinça Babcock', 'Pinça Duval',
+    'Pinça Mixter', 'Pinça Cheron', 'Pinça Collin', 'Pinça Satinsky',
+    'Pinça DeBakey', 'Pinça Potts-Smith', 'Pinça Lahey', 'Pinça Cushing'
+  ],
+  tesoura: [
+    'Tesoura Metzenbaum reta', 'Tesoura Metzenbaum curva', 'Tesoura Iris reta',
+    'Tesoura Iris curva', 'Tesoura Potts', 'Tesoura Spencer',
+    'Tesoura Stevens', 'Tesoura Sims', 'Tesoura Joseph', 'Tesoura Nelson'
+  ],
+  portaAgulha: [
+    'Porta-agulha Crile-Wood', 'Porta-agulha Olsen-Hegar',
+    'Porta-agulha Castroviejo', 'Porta-agulha Ryder',
+    'Porta-agulha Gillies', 'Porta-agulha Webster'
+  ],
+  afastador: [
+    'Afastador Deaver', 'Afastador Richardson', 'Afastador Senn-Miller',
+    'Afastador Balfour', 'Afastador Finochietto', 'Afastador Doyen',
+    'Afastador Gelpi', 'Afastador Weitlaner'
+  ]
+};
+
+function getCategory(item) {
+  const n = normalizeText(item.name);
+  if (n.startsWith('tesoura')) return 'tesoura';
+  if (n.startsWith('porta agulha')) return 'portaAgulha';
+  if (n.startsWith('afastador')) return 'afastador';
+  if (n.startsWith('pinca')) return 'pinca';
+  return 'geral';
+}
+
+function categoryLabel(cat) {
+  return {
+    pinca: 'pinças',
+    tesoura: 'tesouras',
+    portaAgulha: 'porta-agulhas',
+    afastador: 'afastadores',
+    geral: 'instrumentos'
+  }[cat] || 'instrumentos';
+}
+
+function makeExtraOption(name, cat) {
+  return {
+    id: `extra-${cat}-${normalizeText(name).replace(/\s+/g, '-')}`,
+    name,
+    extra: true
+  };
+}
+
+function getWrongOptions() {
+  const cat = getCategory(current);
+  const sameTypeFromFile = INSTRUMENTS.filter(x => x.id !== current.id && getCategory(x) === cat);
+  const extraSameType = (DISTRACTOR_BANK[cat] || [])
+    .filter(name => normalizeText(name) !== normalizeText(current.name))
+    .map(name => makeExtraOption(name, cat));
+
+  // As alternativas erradas sempre ficam na mesma família do instrumento atual.
+  // Quando o PDF não tem opções suficientes, usamos nomes extras só como distração.
+  return shuffle([...sameTypeFromFile, ...extraSameType]).slice(0, 3);
+}
+
 function renderOptions() {
   optionsEl.innerHTML = '';
-  const wrongs = shuffle(INSTRUMENTS.filter(x => x.id !== current.id)).slice(0,3);
+  const wrongs = getWrongOptions();
   const opts = shuffle([current, ...wrongs]);
   opts.forEach(opt => {
     const btn = document.createElement('button');
